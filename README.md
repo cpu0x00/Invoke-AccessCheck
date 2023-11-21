@@ -5,4 +5,4 @@ check for access using SMB: `Invoke-AccessCheck -SMB` *this method uses the tech
 
 check for access using PSRemoting: `Invoke-AccessCheck -PSRemoting` *this method runs the command hostname on all the machines the one returns output is a hit*
 
-**the script relays on ActiveDirectory Module, if it didn't find it, it pulls it and imports automatically**
+**the script relies on ActiveDirectory Module, if it didn't find it, it pulls it and imports automatically**
