@@ -133,7 +133,7 @@ function Invoke-AccessCheck{
         [Parameter(Position = 1, Mandatory = $false)]
         [switch]$PSRemoting,
         [Alias("Server")]
-        [string]$Domain = (Get-ADDomain).DNSRoot
+        [string]$Domain
     )
     # Message
     [Console]::WriteLine("[+] Checking for Access Around The Network")
@@ -141,12 +141,16 @@ function Invoke-AccessCheck{
     # check for access on all computers in current domain
     try {
         # check for AD Module in current session
-        if (!(Get-Module -Name ActiveDirectory)) {
+        if (!(Get-Command Get-ADDomain  -ErrorAction SilentlyContinue)) { # using Get-Module will cause module overlap when running from a non standard session
             # dependency not met
             [Console]::WriteLine("[+] Didn't find ActiveDirectory Module, pulling from Github and importing it, this will take a minute...")
             # pull and import
             Invoke-Expression (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/samratashok/ADModule/master/Import-ActiveDirectory.ps1')
             Import-ActiveDirectory
+        }
+
+        if (!$Domain){ # Rapheal's edit to run Get-ADDomain after verifying ADModule Exists or Grabbing it from Github
+            $Domain = (Get-ADDomain).DNSRoot
         }
 
         # check all computers in the current domain via HTTP
