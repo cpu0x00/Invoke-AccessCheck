@@ -1,81 +1,171 @@
-function CheckSMB
-{ # thanks to Rapheal for this trick (linkedin.com/in/rafa-pimentel)
+function Test-Smb{
+    <#
+    .SYNOPSIS
+    Checks access using SMB/CIFS to the specified or default computer.
 
-    Write-Host ""
-    $comps = Get-ADComputer -Filter *
-    $comps.dnshostname | ForEach-Object {
-        if (ls "\\$_\C$" -ErrorAction SilentlyContinue){
-            Write-Host "[*] Found Access to: $_\C$"
+    .DESCRIPTION
+    The Test-Smb function checks for access to the C$ share on the specified or default computer using the SMB/CIFS protocol. It prints information about the access status to the console.
+
+    .PARAMETER Domain
+    Specifies the domain for which the SMB access should be checked.
+
+    Aliases: Server
+
+    Default Value: The current Active Directory domain obtained using Get-ADDomain.
+
+    .NOTES
+        Author         : Karim Elsobky (https://www.linkedin.com/in/karimelsobky/)
+        Author         : Rafael Pimentel (https://www.linkedin.com/in/rafa-pimentel/) (https://linktr.ee/hackerhermanos)
+        Prerequisite   : AD-Module
+
+    .EXAMPLE
+    Test-Smb
+    Checks SMB access to the C$ share on all computers in the current Active Directory domain.
+
+    #>
+    [CmdletBinding()]
+    Param (
+        [Alias("Server")]
+        [string]$Domain = (Get-ADDomain).DNSRoot
+    )
+    # define computers
+    $ComputerName = (Get-ADComputer -Filter * -Server $Domain)
+    # print info
+    [Console]::WriteLine("[+] Checking Access on all computers in $Domain using SMB/CIFS")
+    # check CIFS access
+    ($ComputerName).dnshostname | 
+        ForEach-Object {
+            if (Get-ChildItem "\\$_\c$" -ErrorAction SilentlyContinue){
+                Write-Host "[*] Found Access to: $_\c$"
         }
-    }  
+    }
 }
 
-function CheckPSRemoting
-{
+function Test-PSRemoting{
+    <#
+    .SYNOPSIS
+        Checks access using PowerShell Remoting (PSRemoting) over HTTP to the specified or default computer.
 
-    [Console]::WriteLine("[+] Checking Access using PSRemoting")
-    Write-Host ""
-    $comps = Get-ADComputer -Filter *   
-    $comps.dnshostname | ForEach-Object {
-        if(Invoke-Command -ComputerName "$_"  -ScriptBlock {hostname} -ErrorAction SilentlyContinue){
-            Write-Host "[*] Found Access to: $_"
+    .DESCRIPTION
+        The Test-PSRemoting function checks for access to the specified or default computer using PowerShell Remoting (PSRemoting) over HTTP. It prints information about the access status to the console.
+
+    .PARAMETER Domain
+        Specifies the domain for which the PSRemoting over HTTP access should be checked.
+
+        Aliases: Server
+
+        Default Value: The current Active Directory domain obtained using Get-ADDomain.
+
+    .NOTES
+        Author         : Karim Elsobky (https://www.linkedin.com/in/karimelsobky/)
+        Author         : Rafael Pimentel (https://www.linkedin.com/in/rafa-pimentel/) (https://linktr.ee/hackerhermanos)
+        Prerequisite   : AD-Module
+
+    .EXAMPLE
+        Test-PSRemoting
+        Checks PSRemoting over HTTP access to all computers in the current Active Directory domain.
+
+    #>
+    [CmdletBinding()]
+    Param (
+        [Alias("Server")]
+        [string]$Domain = (Get-ADDomain).DNSRoot
+    )
+    # define computers
+    $ComputerName = (Get-ADComputer -Filter * -Server $Domain)
+    # print info
+    [Console]::WriteLine("[+] Checking Access on all computers in $Domain using PSRemoting/HTTP")
+    # check http access
+    ($ComputerName).dnshostname | 
+        ForEach-Object {
+            if (Invoke-Command -ComputerName "$_" -ScriptBlock {hostname} -ErrorAction SilentlyContinue){
+                Write-Host "[*] Found Access to: $_"
         }
-    }       
+    }
 }
 
+function Invoke-AccessCheck{
+    <#
+    .SYNOPSIS
+        Checks access on all computers in the current domain using SMB/CIFS or PSRemoting over HTTP.
 
-function Invoke-AccessCheck
-{
+    .DESCRIPTION
+        The Invoke-AccessCheck function checks for access on all computers in the current domain using
+        either SMB/CIFS or PSRemoting over HTTP. It provides options to check access separately for
+        SMB/CIFS or PSRemoting, and it pulls the Active Directory module from GitHub if not already imported.
+
+    .PARAMETER SMB
+        Switch parameter to indicate whether to check access using SMB/CIFS. If specified, the function
+        checks access on all computers in the current domain using SMB/CIFS.
+
+    .PARAMETER PSRemoting
+        Switch parameter to indicate whether to check access using PSRemoting over HTTP. If specified,
+        the function checks access on all computers in the current domain using PSRemoting over HTTP.
+
+    .PARAMETER Domain
+        Specifies the domain for which the PSRemoting over HTTP access should be checked.
+
+        Aliases: Server
+
+        Default Value: The current Active Directory domain obtained using Get-ADDomain.
+
+    .NOTES
+        Author         : Karim Elsobky (https://www.linkedin.com/in/karimelsobky/)
+        Author         : Rafael Pimentel (https://www.linkedin.com/in/rafa-pimentel/) (https://linktr.ee/hackerhermanos)
+        Prerequisite   : AD-Module (if not installed, this function will try to fetch it from Github Automatically)
+
+    .EXAMPLE
+        Invoke-AccessCheck -SMB
+        Checks access using SMB/CIFS on all computers in the current domain.
+
+    .EXAMPLE
+        Invoke-AccessCheck -PSRemoting
+        Checks access using PSRemoting over PSRemoting/HTTP on all computers in the current domain.
+
+    .EXAMPLE
+        Invoke-AccessCheck -PSRemoting -SMB
+        Checks access using PSRemoting over PSRemoting/HTTP and SMB/CIFS on all computers in the current domain.
+    #>
     [CmdletBinding()]
     Param (
         [Parameter(Position = 0, Mandatory = $false)]
-        [switch]
-        $SMB,
-        
+        [switch]$SMB,        
         [Parameter(Position = 1, Mandatory = $false)]
-        [switch]
-        $PSRemoting
+        [switch]$PSRemoting,
+        [Alias("Server")]
+        [string]$Domain = (Get-ADDomain).DNSRoot
     )
-
-<#
-.DESCRIPTION
-    uses either SMB or PSRemoting to check access to all machines around the network   
-
-.PARAMETER PSRemoting
-    use PSRemoting to check access runs the command "hostname" on machines with Invoke-Command, if a hostname returned means we got access 
-
-.PARAMETER SMB
-    use SMB/CIFS to check access, attempts listing the C$ on every machine if an output returns means we got a hit 
-
-.EXAMPLE
-    Invoke-AccessCheck -PSRemoting/-SMB     
-#>
-
-    
-    if (-not ($PSRemoting -or $SMB)) {
-        [Console]::WriteLine("[-] use one of [-SMB | -PSRemoting], Example:  Invoke-AccessCheck -PSRemoting")
-        return
-    }
-
+    # Message
     [Console]::WriteLine("[+] Checking for Access Around The Network")
     
-    if (Get-Module -Name ActiveDirectory -ListAvailable) {
-    Write-Host "[+] Active Directory module is already Imported."
-    } else {
-    [Console]::WriteLine("[+] Didn't Find ActiveDirectory Module,  Pulling and Importing it, this will take a minute...")
-    Invoke-Expression (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/samratashok/ADModule/master/Import-ActiveDirectory.ps1');Import-ActiveDirectory
+    # check for access on all computers in current domain
+    try {
+        # check for AD Module in current session
+        if (!(Get-Module -Name ActiveDirectory)) {
+            # dependency not met
+            [Console]::WriteLine("[+] Didn't find ActiveDirectory Module, pulling from Github and importing it, this will take a minute...")
+            # pull and import
+            Invoke-Expression (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/samratashok/ADModule/master/Import-ActiveDirectory.ps1')
+            Import-ActiveDirectory
+        }
+
+        # check all computers in the current domain via HTTP
+        if ($SMB) {
+            Test-Smb -Domain $Domain
+        }
+    
+        # check all computers in the current domain via HTTP
+        if ($PSRemoting) {
+            Test-PSRemoting -Domain $Domain
+        }
+    
+        # If neither $PSRemoting nor $SMB is specified, print an error
+        if (!($PSRemoting -or $SMB)) {
+            throw "[-] Usage: Invoke-AccessCheck -SMB <or> Invoke-AccessCheck -PSRemoting"
+        }
     }
-
-
-
-    if ($SMB){
-        [Console]::WriteLine("[+] Checking Access using SMB/CIFS")
-        CheckSMB
+    catch {
+        [Console]::WriteLine("Error: $_")
+        return
     }
-
-    if ($PSRemoting){
-        CheckPSRemoting
-    }
-
-
 }
